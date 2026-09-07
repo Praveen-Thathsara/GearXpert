@@ -1,0 +1,46 @@
+#!/bin/bash
+find src -type f -name "*.tsx" -exec sed -i \
+  -e 's/bg-blue-600 hover:bg-blue-700 text-white/bg-amber-500 hover:bg-amber-400 text-zinc-950/g' \
+  -e 's/bg-blue-600 hover:bg-blue-700/bg-amber-500 hover:bg-amber-400/g' \
+  -e 's/bg-blue-600 text-white/bg-amber-500 text-zinc-950/g' \
+  -e 's/bg-blue-600/bg-amber-500/g' \
+  -e 's/bg-white/bg-zinc-900/g' \
+  -e 's/bg-gray-50/bg-zinc-950/g' \
+  -e 's/bg-gray-100/bg-zinc-800/g' \
+  -e 's/bg-gray-200/bg-zinc-800/g' \
+  -e 's/bg-gray-800/bg-zinc-900/g' \
+  -e 's/bg-gray-900/bg-zinc-950/g' \
+  -e 's/text-gray-900/text-zinc-100/g' \
+  -e 's/text-gray-800/text-zinc-200/g' \
+  -e 's/text-gray-700/text-zinc-300/g' \
+  -e 's/text-gray-600/text-zinc-400/g' \
+  -e 's/text-gray-500/text-zinc-400/g' \
+  -e 's/text-gray-400/text-zinc-500/g' \
+  -e 's/border-gray-100/border-zinc-800/g' \
+  -e 's/border-gray-200/border-zinc-700/g' \
+  -e 's/border-gray-300/border-zinc-700/g' \
+  -e 's/text-blue-600/text-amber-500/g' \
+  -e 's/text-blue-900/text-amber-900/g' \
+  -e 's/text-blue-800/text-amber-700/g' \
+  -e 's/text-blue-400/text-amber-400/g' \
+  -e 's/text-blue-300/text-amber-300/g' \
+  -e 's/text-blue-200/text-amber-200/g' \
+  -e 's/hover:text-blue-600/hover:text-amber-400/g' \
+  -e 's/hover:text-blue-800/hover:text-amber-300/g' \
+  -e 's/bg-blue-50/bg-amber-500\/10/g' \
+  -e 's/bg-blue-100/bg-amber-500\/20/g' \
+  -e 's/bg-blue-900\/50/bg-amber-900\/20/g' \
+  -e 's/ring-blue-500/ring-amber-500/g' \
+  -e 's/border-blue-500/border-amber-500/g' \
+  -e 's/rounded-3xl/rounded-sm/g' \
+  -e 's/rounded-2xl/rounded-sm/g' \
+  -e 's/rounded-xl/rounded-sm/g' \
+  -e 's/rounded-lg/rounded-sm/g' \
+  -e 's/rounded-md/rounded-sm/g' \
+  -e 's/rounded-full/rounded-sm/g' \
+  -e 's/shadow-sm/shadow-none/g' \
+  -e 's/shadow-md/shadow-none/g' \
+  -e 's/shadow-2xl/shadow-none/g' \
+  -e 's/AutoParts Lanka/GearXpert/g' \
+  -e 's/APL/GXP/g' \
+  {} +

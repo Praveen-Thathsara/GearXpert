@@ -1,0 +1,8 @@
+{
+  "name": "AutoParts Lanka",
+  "description": "Professional vehicle spare parts catalog and request cart system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
