@@ -19,7 +19,6 @@ export interface CustomerDetails {
   phone: string;
   whatsapp: string;
   location: string;
-  email?: string;
   address?: string;
   message?: string;
 }

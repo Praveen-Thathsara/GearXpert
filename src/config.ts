@@ -1,7 +1,7 @@
 export const config = {
   businessName: "GearXpert",
-  phone: "+94 77 123 4567",
-  whatsapp: "+94771234567", // numeric for links
+  phone: '0771234567',
+  whatsapp: '94771234567', // numeric for links
   whatsappDisplay: "+94 77 123 4567",
   email: "sales@gearxpert.com",
   address: "123 Mechanical Drive, Colombo, Sri Lanka",
