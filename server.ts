@@ -5,8 +5,8 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
+import "dotenv/config";
 
-// Simple JSON structure for products (Backend uses this for validation)
 const products = [
   { id: "1", name: "Honda Dio Front Brake Pad", category: "Brake Parts", brand: "Honda", model: "Dio", partNumber: "BP-DIO-001", price: 1500, showPrice: true, availability: "In Stock" },
   { id: "2", name: "Honda CD70 Chain Set", category: "Chain & Sprocket", brand: "Honda", model: "CD70", partNumber: "CS-CD70-001", price: 4500, showPrice: true, availability: "In Stock" },
@@ -34,168 +34,314 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
 
-  // Security and utilities
-  app.use(helmet({
-    contentSecurityPolicy: false // Disable CSP for local dev/Vite compat
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    })
+  );
+
   app.use(cors());
   app.use(express.json());
 
-  // Rate limiting for API requests
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // Limit each IP to 50 requests per windowMs
-    message: "Too many requests from this IP, please try again after 15 minutes."
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    message: "Too many requests from this IP, please try again after 15 minutes.",
   });
 
-  // Basic health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
-  
-  // Expose product data for frontend API
+
   app.get("/api/products", (req, res) => {
     res.json(products);
   });
 
-  // Handle Parts Request
   app.post("/api/requests", apiLimiter, async (req, res) => {
     try {
       const { customer, items } = req.body;
 
       if (!customer || !items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "Invalid request data. Customer details and items are required." });
-      }
-      
-      if (!customer.fullName || !customer.phone || !customer.whatsapp || !customer.location) {
-        return res.status(400).json({ error: "Missing required customer details." });
+        return res.status(400).json({
+          error: "Invalid request data. Customer details and items are required.",
+        });
       }
 
-      // Re-validate products against backend data to avoid frontend spoofing
+      if (
+        !customer.fullName ||
+        !customer.phone ||
+        !customer.whatsapp ||
+        !customer.location
+      ) {
+        return res.status(400).json({
+          error: "Missing required customer details.",
+        });
+      }
+
       const validatedItems = items.map((reqItem: any) => {
-        const product = products.find(p => p.id === reqItem.productId);
+        const product = products.find(
+          (product) => product.id === reqItem.productId
+        );
+
         if (!product) {
-          throw new Error(`Product with ID ${reqItem.productId} not found.`);
+          throw new Error(
+            `Product with ID ${reqItem.productId} not found.`
+          );
         }
+
         return {
           ...product,
-          quantity: reqItem.quantity || 1
+          quantity: reqItem.quantity || 1,
         };
       });
 
-      // Generate request number
-      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+      const dateStr = new Date()
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, "");
+
+      const randomNum = Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0");
+
       const requestNumber = `REQ-${dateStr}-${randomNum}`;
 
-      // Setup Nodemailer
+      // Gmail SMTP
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.example.com",
-        port: parseInt(process.env.SMTP_PORT || "587"),
-        secure: process.env.SMTP_SECURE === "true",
+        service: "gmail",
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASSWORD,
         },
       });
 
-      // HTML Email Template
-      const itemsListHtml = validatedItems.map((item, index) => `
-        <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd;">${index + 1}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-            <strong>${item.name}</strong><br>
-            <small style="color: #666;">Part Number: ${item.partNumber}</small>
-          </td>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-        </tr>
-      `).join("");
+      const itemsListHtml = validatedItems
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:10px;border-bottom:1px solid #ddd;">
+                ${index + 1}
+              </td>
+
+              <td style="padding:10px;border-bottom:1px solid #ddd;">
+                <strong>${item.name}</strong><br>
+                <small>Part Number: ${item.partNumber}</small><br>
+                <small>Brand: ${item.brand}</small><br>
+                <small>Model: ${item.model}</small>
+              </td>
+
+              <td style="padding:10px;border-bottom:1px solid #ddd;text-align:center;">
+                ${item.quantity}
+              </td>
+            </tr>
+          `
+        )
+        .join("");
 
       const mailOptions = {
-        from: `"AutoParts Lanka System" <${process.env.SMTP_USER}>`,
-        to: process.env.BUSINESS_EMAIL || "sales@autopartslanka.com",
+        from: `"${process.env.BUSINESS_NAME || "GearXpert"}" <${process.env.SMTP_USER}>`,
+
+        to: process.env.BUSINESS_EMAIL,
+
+        replyTo: customer.email || undefined,
+
         subject: `New Parts Request - ${requestNumber}`,
+
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">NEW PARTS REQUEST</h2>
-            
-            <p><strong>Request Number:</strong> <span style="color: #d97706; font-weight: bold;">${requestNumber}</span></p>
-            <p><strong>Submitted:</strong> ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            
-            <h3 style="background-color: #f3f4f6; padding: 10px; border-radius: 4px; margin-top: 25px;">Customer Details:</h3>
-            <table style="width: 100%; margin-bottom: 20px;">
-              <tr><td style="padding: 5px 0; width: 120px;"><strong>Name:</strong></td><td>${customer.fullName}</td></tr>
-              <tr><td style="padding: 5px 0;"><strong>Phone:</strong></td><td><a href="tel:${customer.phone}">${customer.phone}</a></td></tr>
-              <tr><td style="padding: 5px 0;"><strong>WhatsApp:</strong></td><td>${customer.whatsapp}</td></tr>
-              <tr><td style="padding: 5px 0;"><strong>Email:</strong></td><td>${customer.email ? `<a href="mailto:${customer.email}">${customer.email}</a>` : 'N/A'}</td></tr>
-              <tr><td style="padding: 5px 0;"><strong>Location:</strong></td><td>${customer.location}</td></tr>
-              <tr><td style="padding: 5px 0;"><strong>Address:</strong></td><td>${customer.address || 'N/A'}</td></tr>
+          <div style="
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: auto;
+            padding: 25px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+          ">
+
+            <h2 style="
+              color:#1e3a8a;
+              border-bottom:2px solid #1e3a8a;
+              padding-bottom:10px;
+            ">
+              NEW PARTS REQUEST
+            </h2>
+
+            <p>
+              <strong>Request Number:</strong>
+              <span style="color:#d97706;font-weight:bold;">
+                ${requestNumber}
+              </span>
+            </p>
+
+            <p>
+              <strong>Submitted:</strong>
+              ${new Date().toLocaleString("en-GB")}
+            </p>
+
+            <h3 style="background:#f3f4f6;padding:10px;">
+              Customer Details
+            </h3>
+
+            <table style="width:100%;margin-bottom:20px;">
+              <tr>
+                <td style="padding:5px;width:130px;">
+                  <strong>Name:</strong>
+                </td>
+                <td>${customer.fullName}</td>
+              </tr>
+
+              <tr>
+                <td style="padding:5px;">
+                  <strong>Phone:</strong>
+                </td>
+                <td>
+                  <a href="tel:${customer.phone}">
+                    ${customer.phone}
+                  </a>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding:5px;">
+                  <strong>WhatsApp:</strong>
+                </td>
+                <td>${customer.whatsapp}</td>
+              </tr>
+
+              <tr>
+                <td style="padding:5px;">
+                  <strong>Email:</strong>
+                </td>
+                <td>
+                  ${
+                    customer.email
+                      ? `<a href="mailto:${customer.email}">
+                          ${customer.email}
+                         </a>`
+                      : "N/A"
+                  }
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding:5px;">
+                  <strong>Location:</strong>
+                </td>
+                <td>${customer.location}</td>
+              </tr>
+
+              <tr>
+                <td style="padding:5px;">
+                  <strong>Address:</strong>
+                </td>
+                <td>${customer.address || "N/A"}</td>
+              </tr>
             </table>
 
-            <h3 style="background-color: #f3f4f6; padding: 10px; border-radius: 4px; margin-top: 25px;">Requested Parts:</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <h3 style="background:#f3f4f6;padding:10px;">
+              Requested Parts
+            </h3>
+
+            <table style="
+              width:100%;
+              border-collapse:collapse;
+              margin-bottom:20px;
+            ">
+
               <thead>
-                <tr style="background-color: #f9fafb;">
-                  <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd; width: 40px;">#</th>
-                  <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Product Details</th>
-                  <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd; width: 80px;">Qty</th>
+                <tr style="background:#f9fafb;">
+                  <th style="padding:10px;text-align:left;">
+                    #
+                  </th>
+
+                  <th style="padding:10px;text-align:left;">
+                    Product Details
+                  </th>
+
+                  <th style="padding:10px;text-align:center;">
+                    Quantity
+                  </th>
                 </tr>
               </thead>
+
               <tbody>
                 ${itemsListHtml}
               </tbody>
+
             </table>
 
-            ${customer.message ? `
-              <h3 style="background-color: #f3f4f6; padding: 10px; border-radius: 4px; margin-top: 25px;">Customer Message:</h3>
-              <div style="padding: 15px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-style: italic;">
-                "${customer.message}"
-              </div>
-            ` : ''}
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #6b7280; font-size: 12px;">
-              <p>This is an automated message from the AutoParts Lanka request system.</p>
+            ${
+              customer.message
+                ? `
+                  <h3 style="background:#f3f4f6;padding:10px;">
+                    Customer Message
+                  </h3>
+
+                  <div style="
+                    padding:15px;
+                    background:#fffbeb;
+                    border-left:4px solid #f59e0b;
+                  ">
+                    ${customer.message}
+                  </div>
+                `
+                : ""
+            }
+
+            <div style="
+              margin-top:30px;
+              padding-top:15px;
+              border-top:1px solid #eee;
+              color:#777;
+              font-size:12px;
+            ">
+              This is an automated parts request from ${process.env.BUSINESS_NAME || "GearXpert"}.
             </div>
+
           </div>
         `,
       };
 
-      // Only attempt to send email if SMTP user is configured, otherwise just simulate success
-      // This ensures the demo works without needing real credentials immediately
-      if (process.env.SMTP_USER && process.env.SMTP_USER !== 'your_smtp_user') {
-        await transporter.sendMail(mailOptions);
-        console.log(`Request ${requestNumber} email sent successfully`);
-      } else {
-        console.log(`[SIMULATION] Request ${requestNumber} processed successfully. Configure SMTP_USER to send real emails.`);
-      }
+      await transporter.sendMail(mailOptions);
 
-      res.status(200).json({ 
-        success: true, 
+      console.log(
+        `Request ${requestNumber} email sent successfully to ${process.env.BUSINESS_EMAIL}`
+      );
+
+      res.status(200).json({
+        success: true,
         message: "Request submitted successfully",
-        requestNumber
+        requestNumber,
       });
+
     } catch (error: any) {
       console.error("Error processing request:", error);
-      res.status(500).json({ error: "Failed to process request. Please try again later." });
+
+      res.status(500).json({
+        error: "Failed to send request. Please try again later.",
+      });
     }
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+      },
       appType: "spa",
     });
+
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), "dist");
+
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0" as any, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

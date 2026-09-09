@@ -11,7 +11,7 @@ export function CustomerRequest() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [formData, setFormData] = useState<CustomerDetails>({
     fullName: '',
     phone: '',
@@ -45,7 +45,7 @@ export function CustomerRequest() {
     if (!formData.phone.trim()) errors.phone = 'Phone Number is required';
     if (!formData.whatsapp.trim()) errors.whatsapp = 'WhatsApp Number is required';
     if (!formData.location.trim()) errors.location = 'Location (City/Town) is required';
-    
+
     if (formData.email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address';
     }
@@ -57,7 +57,7 @@ export function CustomerRequest() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!validateForm()) {
       // Scroll to top to see errors if any
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -65,11 +65,19 @@ export function CustomerRequest() {
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const response = await submitRequest(formData, items);
+
       clearCart();
-      navigate('/success', { state: { requestNumber: response.requestNumber } });
+
+      navigate('/success', {
+        state: {
+          requestNumber: response.requestNumber,
+          customer: formData,
+          items: items
+        }
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to submit request. Please try again or contact us via WhatsApp.');
       setIsSubmitting(false);
@@ -85,12 +93,12 @@ export function CustomerRequest() {
       </nav>
 
       <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
-        
+
         {/* Form Section */}
         <div className="lg:col-span-2">
           <h1 className="text-3xl font-extrabold text-zinc-100 mb-2">Complete Your Parts Request</h1>
           <p className="text-zinc-400 mb-8 text-lg">Please provide your contact details so our team can reach out to you with pricing and availability confirmation.</p>
-          
+
           {error && (
             <div className="mb-8 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-md flex items-start gap-3">
               <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
@@ -99,11 +107,11 @@ export function CustomerRequest() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-8 bg-zinc-900 p-6 md:p-8 rounded-sm shadow-none border border-zinc-800">
-            
+
             {/* Required Information */}
             <div className="space-y-6">
               <h3 className="text-xl font-bold border-b border-zinc-800 pb-2">Required Information</h3>
-              
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="fullName" className="block text-sm font-semibold text-zinc-300 mb-2">Full Name *</label>
@@ -118,7 +126,7 @@ export function CustomerRequest() {
                   />
                   {validationErrors.fullName && <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.fullName}</p>}
                 </div>
-                
+
                 <div>
                   <label htmlFor="location" className="block text-sm font-semibold text-zinc-300 mb-2">Location (City/Town) *</label>
                   <input
@@ -146,12 +154,12 @@ export function CustomerRequest() {
                   />
                   {validationErrors.phone && <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.phone}</p>}
                 </div>
-                
+
                 <div>
                   <label htmlFor="whatsapp" className="block text-sm font-semibold text-zinc-300 mb-2">WhatsApp Number *</label>
                   <div className="flex">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => {
                         setFormData(prev => ({ ...prev, whatsapp: prev.phone }));
                         setValidationErrors(prev => ({ ...prev, whatsapp: undefined }));
@@ -178,7 +186,7 @@ export function CustomerRequest() {
             {/* Optional Information */}
             <div className="space-y-6 pt-4">
               <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-zinc-400">Optional Details</h3>
-              
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label htmlFor="address" className="block text-sm font-semibold text-zinc-300 mb-2">Delivery Address</label>
@@ -206,7 +214,7 @@ export function CustomerRequest() {
                   />
                   {validationErrors.email && <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.email}</p>}
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label htmlFor="message" className="block text-sm font-semibold text-zinc-300 mb-2">Additional Message</label>
                   <textarea
@@ -226,11 +234,10 @@ export function CustomerRequest() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`w-full md:w-auto md:min-w-[250px] flex items-center justify-center gap-2 font-bold py-4 px-8 rounded-sm transition-colors shadow-none text-lg ${
-                  isSubmitting 
-                    ? 'bg-amber-800 cursor-not-allowed text-white' 
+                className={`w-full md:w-auto md:min-w-[250px] flex items-center justify-center gap-2 font-bold py-4 px-8 rounded-sm transition-colors shadow-none text-lg ${isSubmitting
+                    ? 'bg-amber-800 cursor-not-allowed text-white'
                     : 'bg-amber-500 hover:bg-amber-400 text-zinc-950'
-                }`}
+                  }`}
               >
                 {isSubmitting ? (
                   <>

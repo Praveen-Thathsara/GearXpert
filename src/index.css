@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Rajdhani', sans-serif;
-  --font-heading: 'Chakra Petch', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Inter', sans-serif;
   --animate-spin-slow: spin 8s linear infinite;
 }
 
@@ -12,10 +12,10 @@
     color: #d4d4d8; /* zinc-300 */
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
   
   /* Mechanical scrollbar */
   ::-webkit-scrollbar {
