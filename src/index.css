@@ -53,4 +53,51 @@
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgb(37 99 235 / 0.15);
 }
+
+/* Admin Dashboard */
+.admin-dashboard {
+  color: #111827;
+}
+
+.admin-dashboard h1,
+.admin-dashboard h2,
+.admin-dashboard h3,
+.admin-dashboard p,
+.admin-dashboard label,
+.admin-dashboard span {
+  color: #111827;
+}
+
+.admin-dashboard .text-gray-500 {
+  color: #6b7280;
+}
+
+.admin-dashboard .text-gray-400 {
+  color: #9ca3af;
+}
+
+.admin-dashboard input,
+.admin-dashboard select {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.admin-dashboard input::placeholder {
+  color: #9ca3af;
+}
+
+.admin-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+}
+
+.admin-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.15);
+}
 }

@@ -262,7 +262,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 text-gray-900">
       {/* HEADER */}
 
       <header className="bg-white border-b">
