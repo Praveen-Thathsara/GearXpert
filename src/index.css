@@ -39,4 +39,18 @@
                       linear-gradient(to bottom, #18181b 1px, transparent 1px);
     background-size: 40px 40px;
   }
+
+  .admin-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  background: white;
+  outline: none;
+}
+
+.admin-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.15);
+}
 }
