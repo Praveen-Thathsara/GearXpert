@@ -115,27 +115,50 @@ async function startServer() {
         });
       }
 
-      const products = data.map((product) => ({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        brand: product.brand,
-        model: product.model,
-        partNumber: product.part_number,
+      const products = data.map((product) => {
 
-        // Original price
-        price: Number(product.price),
+        const imageUrls =
+          Array.isArray(product.image_urls)
+            ? product.image_urls.filter(
+              (url: unknown): url is string =>
+                typeof url === "string" &&
+                url.trim().length > 0
+            )
+            : product.image_url
+              ? [product.image_url]
+              : [];
 
-        // Discount price
-        discountPrice:
-          product.discount_price !== null &&
-            product.discount_price !== undefined
-            ? Number(product.discount_price)
-            : null,
+        return {
+          id: product.id,
 
-        showPrice: product.show_price,
-        availability: product.availability,
-      }));
+          name: product.name,
+          category: product.category,
+          brand: product.brand,
+          model: product.model,
+          partNumber: product.part_number,
+
+          price: Number(product.price),
+
+          discountPrice:
+            product.discount_price !== null &&
+              product.discount_price !== undefined
+              ? Number(product.discount_price)
+              : null,
+
+          showPrice:
+            product.show_price,
+
+          availability:
+            product.availability,
+
+          // Main image
+          imageUrl:
+            imageUrls[0] || null,
+
+          // All images
+          imageUrls,
+        };
+      });
 
       res.json(products);
     } catch (error) {
@@ -166,6 +189,8 @@ async function startServer() {
           discountPrice,
           showPrice,
           availability,
+          imageUrl,
+          imageUrls,
         } = req.body;
 
         // ----------------------------------------------
@@ -233,6 +258,16 @@ async function startServer() {
         // INSERT PRODUCT INTO SUPABASE
         // ----------------------------------------------
 
+        const finalImageUrls = Array.isArray(imageUrls)
+          ? imageUrls.filter(
+            (url: unknown): url is string =>
+              typeof url === "string" &&
+              url.trim().length > 0
+          )
+          : imageUrl
+            ? [imageUrl]
+            : [];
+
         const { data, error } = await supabase
           .from("products")
           .insert({
@@ -241,9 +276,10 @@ async function startServer() {
             brand,
             model,
             part_number: partNumber,
-            price: Number(price) || 0,
 
-            // SAVE DISCOUNT PRICE
+            price:
+              Number(price) || 0,
+
             discount_price:
               discountPrice === null ||
                 discountPrice === undefined ||
@@ -258,6 +294,12 @@ async function startServer() {
 
             availability:
               availability || "In Stock",
+
+            image_url:
+              finalImageUrls[0] || null,
+
+            image_urls:
+              finalImageUrls,
           })
           .select()
           .single();
@@ -295,6 +337,12 @@ async function startServer() {
 
             showPrice: data.show_price,
             availability: data.availability,
+            imageUrl: data.image_url || null,
+            imageUrls: Array.isArray(data.image_urls)
+              ? data.image_urls
+              : data.image_url
+                ? [data.image_url]
+                : [],
           },
         });
       } catch (error) {
@@ -328,6 +376,8 @@ async function startServer() {
           discountPrice,
           showPrice,
           availability,
+          imageUrl,
+          imageUrls,
         } = req.body;
 
         // ----------------------------------------------
@@ -391,6 +441,22 @@ async function startServer() {
           });
         }
 
+        
+
+        // ----------------------------------------------
+        // PREPARE PRODUCT IMAGES
+        // ----------------------------------------------
+
+        const finalImageUrls = Array.isArray(imageUrls)
+          ? imageUrls.filter(
+              (url: unknown): url is string =>
+                typeof url === "string" &&
+                url.trim().length > 0
+            )
+          : imageUrl
+            ? [imageUrl]
+            : [];
+
         // ----------------------------------------------
         // UPDATE PRODUCT
         // ----------------------------------------------
@@ -404,12 +470,11 @@ async function startServer() {
             model,
             part_number: partNumber,
 
-            // Original price
-            price: originalPrice,
+            price:
+              originalPrice,
 
-            // IMPORTANT:
-            // Save updated discount price
-            discount_price: finalDiscountPrice,
+            discount_price:
+              finalDiscountPrice,
 
             show_price:
               typeof showPrice === "boolean"
@@ -418,6 +483,12 @@ async function startServer() {
 
             availability:
               availability || "In Stock",
+
+            image_url:
+              finalImageUrls[0] || null,
+
+            image_urls:
+              finalImageUrls,
           })
           .eq("id", id)
           .select()
@@ -459,6 +530,12 @@ async function startServer() {
 
             showPrice: data.show_price,
             availability: data.availability,
+            imageUrl: data.image_url || null,
+            imageUrls: Array.isArray(data.image_urls)
+              ? data.image_urls
+              : data.image_url
+                ? [data.image_url]
+                : [],
           },
         });
       } catch (error) {

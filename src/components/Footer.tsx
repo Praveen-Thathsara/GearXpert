@@ -23,13 +23,9 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Quick Links */}
+          
           <div>
-            <h3 className="text-zinc-100 font-semibold text-lg mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              <li><Link to="/" className="hover:text-amber-400 transition-colors">Home</Link></li>
-              <li><Link to="/#catalog" className="hover:text-amber-400 transition-colors">Products Catalog</Link></li>
-            </ul>
+            
           </div>
 
           {/* Contact Info */}

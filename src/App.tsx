@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import {
   BrowserRouter,
   Routes,
@@ -28,9 +23,12 @@ export default function App() {
       <Routes>
 
         {/* CUSTOMER WEBSITE */}
-
         <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
+
+          <Route
+            index
+            element={<Home />}
+          />
 
           <Route
             path="products"
@@ -42,8 +40,9 @@ export default function App() {
             }
           />
 
+          {/* IMPORTANT: parameter is id */}
           <Route
-            path="products/:slug"
+            path="products/:id"
             element={<ProductDetails />}
           />
 
@@ -61,10 +60,10 @@ export default function App() {
             path="success"
             element={<Success />}
           />
+
         </Route>
 
         {/* ADMIN */}
-
         <Route
           path="/admin/login"
           element={<AdminLogin />}
