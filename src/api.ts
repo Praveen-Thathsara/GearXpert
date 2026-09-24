@@ -4,17 +4,21 @@ const API_BASE = '/api';
 
 export async function fetchProducts(): Promise<Product[]> {
   const response = await fetch(`${API_BASE}/products`);
+
   if (!response.ok) {
     throw new Error('Failed to fetch products');
   }
+
   return response.json();
 }
 
-export async function submitRequest(customer: CustomerDetails, items: CartItem[]) {
-  // Map cart items to what the backend expects
-  const payloadItems = items.map(item => ({
+export async function submitRequest(
+  customer: CustomerDetails,
+  items: CartItem[]
+) {
+  const payloadItems = items.map((item) => ({
     productId: item.id,
-    quantity: item.quantity
+    quantity: item.quantity,
   }));
 
   const response = await fetch(`${API_BASE}/requests`, {
@@ -24,7 +28,7 @@ export async function submitRequest(customer: CustomerDetails, items: CartItem[]
     },
     body: JSON.stringify({
       customer,
-      items: payloadItems
+      items: payloadItems,
     }),
   });
 

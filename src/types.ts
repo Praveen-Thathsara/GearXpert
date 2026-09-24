@@ -6,6 +6,7 @@ export interface Product {
   model: string;
   partNumber: string;
   price: number;
+  discountPrice?: number | null;
   showPrice: boolean;
   availability: string;
 }

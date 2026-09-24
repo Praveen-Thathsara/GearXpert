@@ -17,6 +17,7 @@ const emptyProduct = {
   model: "",
   partNumber: "",
   price: 0,
+  discountPrice: null as number | null,
   showPrice: true,
   availability: "In Stock",
 };
@@ -25,21 +26,20 @@ export function AdminDashboard() {
   const navigate = useNavigate();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const [showForm, setShowForm] = useState(false);
-
   const [form, setForm] = useState(emptyProduct);
 
-  // ---------------------------------------------
-  // LOAD PRODUCTS
-  // ---------------------------------------------
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   async function loadProducts() {
     try {
       setLoading(true);
+      setError("");
 
       const response = await fetch("/api/products");
 
@@ -50,20 +50,19 @@ export function AdminDashboard() {
       const data = await response.json();
 
       setProducts(data);
-    } catch (error) {
-      console.error(error);
-      setError("Failed to load products.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load products"
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  // ---------------------------------------------
-  // CHECK LOGIN
-  // ---------------------------------------------
-
   useEffect(() => {
-    async function checkUser() {
+    async function checkAuth() {
       const {
         data: { user },
       } = await supabaseClient.auth.getUser();
@@ -73,44 +72,87 @@ export function AdminDashboard() {
         return;
       }
 
-      loadProducts();
+      await loadProducts();
     }
 
-    checkUser();
+    checkAuth();
   }, [navigate]);
 
-  // ---------------------------------------------
-  // GET AUTH TOKEN
-  // ---------------------------------------------
-
-  async function getToken() {
+  async function getAccessToken() {
     const {
       data: { session },
     } = await supabaseClient.auth.getSession();
 
-    if (!session) {
-      navigate("/admin/login");
-      throw new Error("Session expired");
+    if (!session?.access_token) {
+      throw new Error("Authentication session expired");
     }
 
     return session.access_token;
   }
 
-  // ---------------------------------------------
-  // ADD PRODUCT
-  // ---------------------------------------------
+  function resetForm() {
+    setForm(emptyProduct);
+    setEditingId(null);
+  }
 
-  async function handleAddProduct(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
+    setError("");
+    setSuccess("");
+    setSaving(true);
+
     try {
-      setSaving(true);
-      setError("");
+      const token = await getAccessToken();
 
-      const token = await getToken();
+      if (!form.name.trim()) {
+        throw new Error("Product name is required");
+      }
 
-      const response = await fetch("/api/admin/products", {
-        method: "POST",
+      if (!form.category.trim()) {
+        throw new Error("Category is required");
+      }
+
+      if (!form.brand.trim()) {
+        throw new Error("Brand is required");
+      }
+
+      if (!form.model.trim()) {
+        throw new Error("Model is required");
+      }
+
+      if (!form.partNumber.trim()) {
+        throw new Error("Part number is required");
+      }
+
+      if (form.price < 0) {
+        throw new Error("Price cannot be negative");
+      }
+
+      if (
+        form.discountPrice !== null &&
+        form.discountPrice < 0
+      ) {
+        throw new Error("Discount price cannot be negative");
+      }
+
+      if (
+        form.discountPrice !== null &&
+        form.discountPrice >= form.price
+      ) {
+        throw new Error(
+          "Discount price must be lower than the original price"
+        );
+      }
+
+      const url = editingId
+        ? `/api/admin/products/${editingId}`
+        : "/api/admin/products";
+
+      const method = editingId ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -121,82 +163,59 @@ export function AdminDashboard() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to add product");
+        throw new Error(
+          data.error || "Failed to save product"
+        );
       }
 
-      setProducts((current) => [
-        data.product,
-        ...current,
-      ]);
+      setSuccess(
+        editingId
+          ? "Product updated successfully."
+          : "Product added successfully."
+      );
 
-      setForm(emptyProduct);
-      setShowForm(false);
-    } catch (error: any) {
-      console.error(error);
-      setError(error.message || "Failed to add product.");
+      resetForm();
+
+      await loadProducts();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong"
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  // ---------------------------------------------
-  // UPDATE PRODUCT
-  // ---------------------------------------------
+  function handleEdit(product: Product) {
+    setEditingId(product.id);
 
-  async function updateProduct(
-    product: Product,
-    changes: Partial<Product>
-  ) {
-    try {
-      const token = await getToken();
+    setForm({
+      name: product.name,
+      category: product.category,
+      brand: product.brand,
+      model: product.model,
+      partNumber: product.partNumber,
+      price: product.price,
+      discountPrice:
+        product.discountPrice ?? null,
+      showPrice: product.showPrice,
+      availability: product.availability,
+    });
 
-      const updatedProduct = {
-        ...product,
-        ...changes,
-      };
+    setError("");
+    setSuccess("");
 
-      const response = await fetch(
-        `/api/admin/products/${product.id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(updatedProduct),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to update product"
-        );
-      }
-
-      setProducts((current) =>
-        current.map((item) =>
-          item.id === product.id
-            ? data.product
-            : item
-        )
-      );
-    } catch (error: any) {
-      console.error(error);
-      setError(
-        error.message || "Failed to update product."
-      );
-    }
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
-  // ---------------------------------------------
-  // DELETE PRODUCT
-  // ---------------------------------------------
-
-  async function deleteProduct(product: Product) {
+  async function handleDelete(id: string) {
     const confirmed = window.confirm(
-      `Delete "${product.name}"?`
+      "Are you sure you want to delete this product?"
     );
 
     if (!confirmed) {
@@ -204,10 +223,13 @@ export function AdminDashboard() {
     }
 
     try {
-      const token = await getToken();
+      setError("");
+      setSuccess("");
+
+      const token = await getAccessToken();
 
       const response = await fetch(
-        `/api/admin/products/${product.id}`,
+        `/api/admin/products/${id}`,
         {
           method: "DELETE",
           headers: {
@@ -224,403 +246,487 @@ export function AdminDashboard() {
         );
       }
 
-      setProducts((current) =>
-        current.filter(
-          (item) => item.id !== product.id
-        )
-      );
-    } catch (error: any) {
-      console.error(error);
+      setSuccess("Product deleted successfully.");
+
+      await loadProducts();
+    } catch (err) {
       setError(
-        error.message || "Failed to delete product."
+        err instanceof Error
+          ? err.message
+          : "Failed to delete product"
       );
     }
   }
 
-  // ---------------------------------------------
-  // LOGOUT
-  // ---------------------------------------------
-
-  async function logout() {
+  async function handleLogout() {
     await supabaseClient.auth.signOut();
-
     navigate("/admin/login");
   }
 
-  // ---------------------------------------------
-  // UI
-  // ---------------------------------------------
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">
-          Loading products...
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
-      {/* HEADER */}
+    <div className="admin-dashboard min-h-screen bg-gray-100 text-gray-900">
 
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      {/* HEADER */}
+      <header className="bg-white border-b border-zinc-200 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
+
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl font-bold">
               GearXpert Admin
             </h1>
 
-            <p className="text-sm text-gray-500">
+            <p className="text-xs text-zinc-400">
               Product Management
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700"
-            >
-              {showForm
-                ? "Close"
-                : "+ Add Product"}
-            </button>
+          <button
+            onClick={handleLogout}
+            className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded text-sm font-semibold"
+          >
+            Logout
+          </button>
 
-            <button
-              onClick={logout}
-              className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-semibold hover:bg-gray-50"
-            >
-              Logout
-            </button>
-          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* ERROR */}
+      {/* MAIN */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
 
+        {/* MESSAGES */}
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-600">
+          <div className="mb-6 bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded">
             {error}
           </div>
         )}
 
-        {/* ADD PRODUCT FORM */}
+        {success && (
+          <div className="mb-6 bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded">
+            {success}
+          </div>
+        )}
 
-        {showForm && (
-          <div className="mb-8 rounded-xl bg-white p-6 shadow-sm border">
-            <h2 className="text-xl font-bold mb-6">
-              Add New Product
-            </h2>
+        {/* ADD / EDIT FORM */}
+        <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mb-8">
 
-            <form
-              onSubmit={handleAddProduct}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-            >
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Product Name
-                </label>
+          <div className="flex items-center justify-between mb-6">
 
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      name: e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                  placeholder="Honda Dio Brake Pad"
-                />
-              </div>
+            <div>
+              <h2 className="text-xl font-bold">
+                {editingId
+                  ? "Edit Product"
+                  : "Add New Product"}
+              </h2>
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Category
-                </label>
+              <p className="text-sm text-gray-500 mt-1">
+                Add product information and pricing.
+              </p>
+            </div>
 
-                <input
-                  required
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      category: e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                  placeholder="Brake Parts"
-                />
-              </div>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-sm text-gray-600 hover:text-black font-semibold"
+              >
+                Cancel Edit
+              </button>
+            )}
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Brand
-                </label>
+          </div>
 
-                <input
-                  required
-                  value={form.brand}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      brand: e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                  placeholder="Honda"
-                />
-              </div>
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 md:grid-cols-2 gap-5"
+          >
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Model
-                </label>
+            {/* PRODUCT NAME */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Product Name
+              </label>
 
-                <input
-                  required
-                  value={form.model}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      model: e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                  placeholder="Dio"
-                />
-              </div>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Product name"
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Part Number
-                </label>
+            {/* CATEGORY */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Category
+              </label>
 
-                <input
-                  required
-                  value={form.partNumber}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      partNumber: e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                  placeholder="BP-DIO-001"
-                />
-              </div>
+              <input
+                type="text"
+                value={form.category}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    category: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Engine, Brake, Electrical..."
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Price
-                </label>
+            {/* BRAND */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Brand
+              </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  value={form.price}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      price: Number(e.target.value),
-                    })
-                  }
-                  className="admin-input"
-                />
-              </div>
+              <input
+                type="text"
+                value={form.brand}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    brand: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Toyota, Honda..."
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Availability
-                </label>
+            {/* MODEL */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Model
+              </label>
 
-                <select
-                  value={form.availability}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      availability:
-                        e.target.value,
-                    })
-                  }
-                  className="admin-input"
-                >
-                  {availabilityOptions.map(
-                    (option) => (
-                      <option
-                        key={option}
-                        value={option}
-                      >
-                        {option}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
+              <input
+                type="text"
+                value={form.model}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    model: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Model"
+                required
+              />
+            </div>
 
-              <div className="flex items-center gap-3">
+            {/* PART NUMBER */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Part Number
+              </label>
+
+              <input
+                type="text"
+                value={form.partNumber}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    partNumber: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Part number"
+                required
+              />
+            </div>
+
+            {/* ORIGINAL PRICE */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Original Price
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                value={form.price}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    price: Number(e.target.value),
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="0"
+                required
+              />
+            </div>
+
+            {/* DISCOUNT PRICE */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Discount Price
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                value={form.discountPrice ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    discountPrice:
+                      e.target.value === ""
+                        ? null
+                        : Number(e.target.value),
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="Optional"
+              />
+
+              <p className="text-xs text-gray-500 mt-1">
+                Leave empty if there is no discount.
+              </p>
+            </div>
+
+            {/* AVAILABILITY */}
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Availability
+              </label>
+
+              <select
+                value={form.availability}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    availability: e.target.value,
+                  })
+                }
+                className="admin-input w-full border border-gray-300 rounded px-3 py-2"
+              >
+                {availabilityOptions.map((option) => (
+                  <option
+                    key={option}
+                    value={option}
+                  >
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* SHOW PRICE */}
+            <div className="md:col-span-2">
+
+              <label className="inline-flex items-center gap-3 cursor-pointer">
+
                 <input
                   type="checkbox"
                   checked={form.showPrice}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      showPrice:
-                        e.target.checked,
+                      showPrice: e.target.checked,
                     })
                   }
-                  className="h-5 w-5"
+                  className="w-4 h-4"
                 />
 
-                <label className="text-sm font-medium">
+                <span className="text-sm font-medium">
                   Show price to customers
-                </label>
-              </div>
+                </span>
 
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full rounded-lg bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  {saving
-                    ? "Adding..."
-                    : "Add Product"}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+              </label>
 
-        {/* PRODUCT COUNT */}
-
-        <div className="mb-5">
-          <h2 className="text-xl font-bold">
-            Products ({products.length})
-          </h2>
-        </div>
-
-        {/* PRODUCTS */}
-
-        <div className="space-y-4">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="bg-white rounded-xl border shadow-sm p-5"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center gap-5">
-                {/* PRODUCT INFO */}
-
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">
-                    {product.name}
-                  </h3>
-
-                  <p className="text-sm text-gray-500 mt-1">
-                    {product.brand} •{" "}
-                    {product.model}
-                  </p>
-
-                  <p className="text-xs text-gray-400 mt-1">
-                    Part No:{" "}
-                    {product.partNumber}
-                  </p>
-                </div>
-
-                {/* PRICE */}
-
-                <div className="lg:w-32">
-                  <p className="text-xs text-gray-500 mb-1">
-                    Price
-                  </p>
-
-                  <p className="font-semibold">
-                    Rs.{" "}
-                    {product.price.toLocaleString()}
-                  </p>
-                </div>
-
-                {/* AVAILABILITY */}
-
-                <div className="lg:w-44">
-                  <p className="text-xs text-gray-500 mb-1">
-                    Availability
-                  </p>
-
-                  <select
-                    value={product.availability}
-                    onChange={(e) =>
-                      updateProduct(
-                        product,
-                        {
-                          availability:
-                            e.target.value,
-                        }
-                      )
-                    }
-                    className="admin-input"
-                  >
-                    {availabilityOptions.map(
-                      (option) => (
-                        <option
-                          key={option}
-                          value={option}
-                        >
-                          {option}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-
-                {/* SHOW PRICE */}
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={product.showPrice}
-                    onChange={(e) =>
-                      updateProduct(
-                        product,
-                        {
-                          showPrice:
-                            e.target.checked,
-                        }
-                      )
-                    }
-                    className="h-5 w-5"
-                  />
-
-                  <span className="text-sm">
-                    Show price
-                  </span>
-                </div>
-
-                {/* DELETE */}
-
-                <button
-                  onClick={() =>
-                    deleteProduct(product)
-                  }
-                  className="rounded-lg bg-red-50 px-4 py-2.5 font-semibold text-red-600 hover:bg-red-100"
-                >
-                  Delete
-                </button>
-              </div>
             </div>
-          ))}
-        </div>
 
-        {products.length === 0 && (
-          <div className="rounded-xl bg-white p-10 text-center">
-            <p className="text-gray-500">
-              No products found.
+            {/* SUBMIT */}
+            <div className="md:col-span-2 flex gap-3">
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-zinc-950 hover:bg-zinc-800 disabled:opacity-50 text-white font-bold px-6 py-3 rounded"
+              >
+                {saving
+                  ? "Saving..."
+                  : editingId
+                  ? "Update Product"
+                  : "Add Product"}
+              </button>
+
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold px-6 py-3 rounded"
+                >
+                  Cancel
+                </button>
+              )}
+
+            </div>
+
+          </form>
+        </section>
+
+        {/* PRODUCT LIST */}
+        <section className="bg-white border border-gray-200 rounded-lg shadow-sm">
+
+          <div className="p-6 border-b border-gray-200">
+
+            <h2 className="text-xl font-bold">
+              Products
+            </h2>
+
+            <p className="text-sm text-gray-500 mt-1">
+              Manage your GearXpert product catalog.
             </p>
+
           </div>
-        )}
+
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">
+              Loading products...
+            </div>
+          ) : products.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              No products found.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5"
+                >
+
+                  {/* PRODUCT INFO */}
+                  <div className="flex-1">
+
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+
+                      <h3 className="font-bold text-gray-900">
+                        {product.name}
+                      </h3>
+
+                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        {product.category}
+                      </span>
+
+                    </div>
+
+                    <p className="text-sm text-gray-500">
+                      {product.brand} {product.model}
+                    </p>
+
+                    <p className="text-xs text-gray-400 font-mono mt-1">
+                      PN: {product.partNumber}
+                    </p>
+
+                  </div>
+
+                  {/* PRICE */}
+                  <div className="min-w-[160px]">
+
+                    {product.discountPrice !== null &&
+                    product.discountPrice !== undefined &&
+                    product.discountPrice < product.price ? (
+                      <>
+                        <p className="text-sm text-gray-400 line-through">
+                          Rs. {product.price.toLocaleString()}
+                        </p>
+
+                        <p className="font-bold text-green-600">
+                          Rs.{" "}
+                          {product.discountPrice.toLocaleString()}
+                        </p>
+
+                        <p className="text-xs text-green-600 font-semibold">
+                          Discount Price
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-semibold">
+                        Rs. {product.price.toLocaleString()}
+                      </p>
+                    )}
+
+                  </div>
+
+                  {/* AVAILABILITY */}
+                  <div className="min-w-[150px]">
+
+                    <span
+                      className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                        product.availability === "In Stock"
+                          ? "bg-green-100 text-green-700"
+                          : product.availability.includes(
+                              "Limited"
+                            )
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {product.availability}
+                    </span>
+
+                  </div>
+
+                  {/* SHOW PRICE */}
+                  <div className="min-w-[100px]">
+
+                    <label className="flex items-center gap-2 text-sm">
+
+                      <input
+                        type="checkbox"
+                        checked={product.showPrice}
+                        readOnly
+                      />
+
+                      Show Price
+
+                    </label>
+
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div className="flex gap-2">
+
+                    <button
+                      onClick={() => handleEdit(product)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleDelete(product.id)
+                      }
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-semibold"
+                    >
+                      Delete
+                    </button>
+
+                  </div>
+
+                </div>
+              ))}
+
+            </div>
+          )}
+
+        </section>
+
       </main>
     </div>
   );

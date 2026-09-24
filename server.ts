@@ -6,10 +6,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 import "dotenv/config";
-import dns from "node:dns";
 import { supabase } from "./src/supabaseServer";
 
-dns.setDefaultResultOrder("ipv4first");
 
 type AuthenticatedRequest = express.Request & {
   user?: any;
@@ -105,10 +103,15 @@ async function startServer() {
         });
 
       if (error) {
-        console.error("Error fetching products:", error);
+        console.error("Error fetching products:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
 
         return res.status(500).json({
-          error: "Failed to fetch products",
+          error: error.message || "Failed to fetch products",
         });
       }
 
@@ -119,7 +122,17 @@ async function startServer() {
         brand: product.brand,
         model: product.model,
         partNumber: product.part_number,
+
+        // Original price
         price: Number(product.price),
+
+        // Discount price
+        discountPrice:
+          product.discount_price !== null &&
+            product.discount_price !== undefined
+            ? Number(product.discount_price)
+            : null,
+
         showPrice: product.show_price,
         availability: product.availability,
       }));
@@ -150,9 +163,14 @@ async function startServer() {
           model,
           partNumber,
           price,
+          discountPrice,
           showPrice,
           availability,
         } = req.body;
+
+        // ----------------------------------------------
+        // REQUIRED FIELDS
+        // ----------------------------------------------
 
         if (
           !name ||
@@ -166,6 +184,55 @@ async function startServer() {
           });
         }
 
+        // ----------------------------------------------
+        // PRICE
+        // ----------------------------------------------
+
+        const originalPrice = Number(price) || 0;
+
+        if (originalPrice < 0) {
+          return res.status(400).json({
+            error: "Original price cannot be negative.",
+          });
+        }
+
+        // ----------------------------------------------
+        // DISCOUNT PRICE
+        // ----------------------------------------------
+
+        const finalDiscountPrice =
+          discountPrice === null ||
+            discountPrice === undefined ||
+            discountPrice === ""
+            ? null
+            : Number(discountPrice);
+
+        // Check valid number
+        if (
+          finalDiscountPrice !== null &&
+          (Number.isNaN(finalDiscountPrice) ||
+            finalDiscountPrice < 0)
+        ) {
+          return res.status(400).json({
+            error: "Discount price must be a valid positive number.",
+          });
+        }
+
+        // Discount must be lower than original price
+        if (
+          finalDiscountPrice !== null &&
+          finalDiscountPrice >= originalPrice
+        ) {
+          return res.status(400).json({
+            error:
+              "Discount price must be lower than the original price.",
+          });
+        }
+
+        // ----------------------------------------------
+        // INSERT PRODUCT INTO SUPABASE
+        // ----------------------------------------------
+
         const { data, error } = await supabase
           .from("products")
           .insert({
@@ -175,10 +242,20 @@ async function startServer() {
             model,
             part_number: partNumber,
             price: Number(price) || 0,
+
+            // SAVE DISCOUNT PRICE
+            discount_price:
+              discountPrice === null ||
+                discountPrice === undefined ||
+                discountPrice === ""
+                ? null
+                : Number(discountPrice),
+
             show_price:
               typeof showPrice === "boolean"
                 ? showPrice
                 : true,
+
             availability:
               availability || "In Stock",
           })
@@ -193,8 +270,13 @@ async function startServer() {
           });
         }
 
+        // ----------------------------------------------
+        // RESPONSE
+        // ----------------------------------------------
+
         res.status(201).json({
           success: true,
+
           product: {
             id: data.id,
             name: data.name,
@@ -202,7 +284,15 @@ async function startServer() {
             brand: data.brand,
             model: data.model,
             partNumber: data.part_number,
+
             price: Number(data.price),
+
+            discountPrice:
+              data.discount_price !== null &&
+                data.discount_price !== undefined
+                ? Number(data.discount_price)
+                : null,
+
             showPrice: data.show_price,
             availability: data.availability,
           },
@@ -235,9 +325,75 @@ async function startServer() {
           model,
           partNumber,
           price,
+          discountPrice,
           showPrice,
           availability,
         } = req.body;
+
+        // ----------------------------------------------
+        // REQUIRED FIELDS
+        // ----------------------------------------------
+
+        if (
+          !name ||
+          !category ||
+          !brand ||
+          !model ||
+          !partNumber
+        ) {
+          return res.status(400).json({
+            error: "Required product fields are missing.",
+          });
+        }
+
+        // ----------------------------------------------
+        // PRICE
+        // ----------------------------------------------
+
+        const originalPrice = Number(price) || 0;
+
+        if (originalPrice < 0) {
+          return res.status(400).json({
+            error: "Original price cannot be negative.",
+          });
+        }
+
+        // ----------------------------------------------
+        // DISCOUNT PRICE
+        // ----------------------------------------------
+
+        const finalDiscountPrice =
+          discountPrice === null ||
+            discountPrice === undefined ||
+            discountPrice === ""
+            ? null
+            : Number(discountPrice);
+
+        // Check valid number
+        if (
+          finalDiscountPrice !== null &&
+          (Number.isNaN(finalDiscountPrice) ||
+            finalDiscountPrice < 0)
+        ) {
+          return res.status(400).json({
+            error: "Discount price must be a valid positive number.",
+          });
+        }
+
+        // Discount must be lower than original price
+        if (
+          finalDiscountPrice !== null &&
+          finalDiscountPrice >= originalPrice
+        ) {
+          return res.status(400).json({
+            error:
+              "Discount price must be lower than the original price.",
+          });
+        }
+
+        // ----------------------------------------------
+        // UPDATE PRODUCT
+        // ----------------------------------------------
 
         const { data, error } = await supabase
           .from("products")
@@ -247,12 +403,21 @@ async function startServer() {
             brand,
             model,
             part_number: partNumber,
-            price: Number(price) || 0,
+
+            // Original price
+            price: originalPrice,
+
+            // IMPORTANT:
+            // Save updated discount price
+            discount_price: finalDiscountPrice,
+
             show_price:
               typeof showPrice === "boolean"
                 ? showPrice
                 : true,
-            availability,
+
+            availability:
+              availability || "In Stock",
           })
           .eq("id", id)
           .select()
@@ -269,8 +434,13 @@ async function startServer() {
           });
         }
 
+        // ----------------------------------------------
+        // RESPONSE
+        // ----------------------------------------------
+
         res.json({
           success: true,
+
           product: {
             id: data.id,
             name: data.name,
@@ -278,7 +448,15 @@ async function startServer() {
             brand: data.brand,
             model: data.model,
             partNumber: data.part_number,
+
             price: Number(data.price),
+
+            discountPrice:
+              data.discount_price !== null &&
+                data.discount_price !== undefined
+                ? Number(data.discount_price)
+                : null,
+
             showPrice: data.show_price,
             availability: data.availability,
           },
@@ -351,6 +529,10 @@ async function startServer() {
       try {
         const { customer, items } = req.body;
 
+        // ----------------------------------------------
+        // VALIDATE REQUEST
+        // ----------------------------------------------
+
         if (
           !customer ||
           !items ||
@@ -363,7 +545,10 @@ async function startServer() {
           });
         }
 
-        // Required customer information
+        // ----------------------------------------------
+        // REQUIRED CUSTOMER INFORMATION
+        // ----------------------------------------------
+
         if (
           !customer.fullName ||
           !customer.phone ||
@@ -376,16 +561,21 @@ async function startServer() {
           });
         }
 
-        // Get products from Supabase
+        // ----------------------------------------------
+        // GET PRODUCTS FROM SUPABASE
+        // ----------------------------------------------
+
         const productIds = items.map(
           (item: any) => item.productId
         );
 
-        const { data: products, error } =
-          await supabase
-            .from("products")
-            .select("*")
-            .in("id", productIds);
+        const {
+          data: products,
+          error,
+        } = await supabase
+          .from("products")
+          .select("*")
+          .in("id", productIds);
 
         if (error) {
           console.error(
@@ -398,6 +588,10 @@ async function startServer() {
               "Failed to validate products.",
           });
         }
+
+        // ----------------------------------------------
+        // VALIDATE PRODUCTS
+        // ----------------------------------------------
 
         const validatedItems = items.map(
           (reqItem: any) => {
@@ -419,17 +613,32 @@ async function startServer() {
               brand: product.brand,
               model: product.model,
               partNumber: product.part_number,
+
+              // Original price
               price: Number(product.price),
+
+              // Discount price
+              discountPrice:
+                product.discount_price !== null &&
+                  product.discount_price !== undefined
+                  ? Number(product.discount_price)
+                  : null,
+
               showPrice: product.show_price,
+
               availability:
                 product.availability,
+
               quantity:
                 reqItem.quantity || 1,
             };
           }
         );
 
-        // Generate request number
+        // ----------------------------------------------
+        // GENERATE REQUEST NUMBER
+        // ----------------------------------------------
+
         const dateStr = new Date()
           .toISOString()
           .slice(0, 10)
@@ -443,64 +652,113 @@ async function startServer() {
 
         const requestNumber = `REQ-${dateStr}-${randomNum}`;
 
-        // Gmail SMTP
+        // ----------------------------------------------
+        // GMAIL SMTP
+        // ----------------------------------------------
+
         const transporter =
           nodemailer.createTransport({
             host: "smtp.gmail.com",
             port: 587,
             secure: false,
             requireTLS: true,
+
             auth: {
               user: process.env.SMTP_USER,
               pass: process.env.SMTP_PASSWORD,
             },
           });
 
-        // Requested parts HTML
+        // ----------------------------------------------
+        // REQUESTED PARTS HTML
+        // ----------------------------------------------
+
         const itemsListHtml =
           validatedItems
             .map(
-              (item, index) => `
-                <tr>
-                  <td style="
-                    padding:10px;
-                    border-bottom:1px solid #ddd;
-                  ">
-                    ${index + 1}
-                  </td>
+              (item, index) => {
+                const hasDiscount =
+                  item.discountPrice !== null &&
+                  item.discountPrice !== undefined &&
+                  item.discountPrice < item.price;
 
-                  <td style="
-                    padding:10px;
-                    border-bottom:1px solid #ddd;
-                  ">
-                    <strong>${item.name}</strong><br>
-                    <small>
-                      Part Number:
-                      ${item.partNumber}
-                    </small><br>
-                    <small>
-                      Brand:
-                      ${item.brand}
-                    </small><br>
-                    <small>
-                      Model:
-                      ${item.model}
-                    </small>
-                  </td>
+                const priceHtml = item.showPrice
+                  ? hasDiscount
+                    ? `
+                      <span style="
+                        color:#777;
+                        text-decoration:line-through;
+                      ">
+                        Rs. ${item.price.toLocaleString()}
+                      </span>
+                      <br>
+                      <strong style="color:#16a34a;">
+                        Rs. ${item.discountPrice!.toLocaleString()}
+                      </strong>
+                    `
+                    : `
+                      <strong>
+                        Rs. ${item.price.toLocaleString()}
+                      </strong>
+                    `
+                  : "Contact Price";
 
-                  <td style="
-                    padding:10px;
-                    border-bottom:1px solid #ddd;
-                    text-align:center;
-                  ">
-                    ${item.quantity}
-                  </td>
-                </tr>
-              `
+                return `
+                  <tr>
+                    <td style="
+                      padding:10px;
+                      border-bottom:1px solid #ddd;
+                    ">
+                      ${index + 1}
+                    </td>
+
+                    <td style="
+                      padding:10px;
+                      border-bottom:1px solid #ddd;
+                    ">
+                      <strong>${item.name}</strong><br>
+
+                      <small>
+                        Part Number:
+                        ${item.partNumber}
+                      </small><br>
+
+                      <small>
+                        Brand:
+                        ${item.brand}
+                      </small><br>
+
+                      <small>
+                        Model:
+                        ${item.model}
+                      </small>
+                    </td>
+
+                    <td style="
+                      padding:10px;
+                      border-bottom:1px solid #ddd;
+                      text-align:center;
+                    ">
+                      ${item.quantity}
+                    </td>
+
+                    <td style="
+                      padding:10px;
+                      border-bottom:1px solid #ddd;
+                      text-align:right;
+                    ">
+                      ${priceHtml}
+                    </td>
+                  </tr>
+                `;
+              }
             )
             .join("");
 
-        // Email
+        // ----------------------------------------------
+        // EMAIL
+        // ----------------------------------------------
+
         const mailOptions = {
           from: `"${process.env.BUSINESS_NAME || "GearXpert"}" <${process.env.SMTP_USER}>`,
 
@@ -546,8 +804,8 @@ async function startServer() {
                 </strong>
 
                 ${new Date().toLocaleString(
-                  "en-GB"
-                )}
+            "en-GB"
+          )}
               </p>
 
               <h3 style="
@@ -658,6 +916,13 @@ async function startServer() {
                       Quantity
                     </th>
 
+                    <th style="
+                      padding:10px;
+                      text-align:right;
+                    ">
+                      Price
+                    </th>
+
                   </tr>
                 </thead>
 
@@ -667,9 +932,8 @@ async function startServer() {
 
               </table>
 
-              ${
-                customer.message
-                  ? `
+              ${customer.message
+              ? `
                     <h3 style="
                       background:#f3f4f6;
                       padding:10px;
@@ -685,8 +949,8 @@ async function startServer() {
                       ${customer.message}
                     </div>
                   `
-                  : ""
-              }
+              : ""
+            }
 
               <div style="
                 margin-top:30px;
@@ -696,17 +960,19 @@ async function startServer() {
                 font-size:12px;
               ">
                 This is an automated parts request from
-                ${
-                  process.env.BUSINESS_NAME ||
-                  "GearXpert"
-                }.
+                ${process.env.BUSINESS_NAME ||
+            "GearXpert"
+            }.
               </div>
 
             </div>
           `,
         };
 
-        // Send email
+        // ----------------------------------------------
+        // SEND EMAIL
+        // ----------------------------------------------
+
         await transporter.sendMail(
           mailOptions
         );
@@ -744,6 +1010,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
       },
+
       appType: "spa",
     });
 
@@ -774,4 +1041,4 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error); 
+startServer().catch(console.error);
