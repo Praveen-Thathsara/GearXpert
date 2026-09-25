@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
 import {
-  getPublicSupabase,
+  getServerSupabase,
   sendError,
 } from "../src/vercelApiUtils";
 
@@ -64,7 +64,7 @@ export default async function handler(
     }
 
     const supabase =
-      getPublicSupabase();
+      getServerSupabase();
 
     const {
       data: products,
