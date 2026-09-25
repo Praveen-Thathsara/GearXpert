@@ -1,10 +1,4 @@
-import {
-  getServerSupabase,
-  normalizeProduct,
-  requireAdmin,
-  sendError,
-  validateProductBody,
-} from "../../src/vercelApiUtils";
+import { requireAdmin, getServerSupabase, validateProductBody, sendError, normalizeProduct } from '../../src/vercelApiUtils.js';
 
 export default async function handler(req: any, res: any) {
   try {

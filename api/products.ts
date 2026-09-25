@@ -1,4 +1,4 @@
-import { getServerSupabase, normalizeProduct, sendError } from '../src/vercelApiUtils';
+import { getServerSupabase, normalizeProduct, sendError } from '../src/vercelApiUtils.js';  
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {

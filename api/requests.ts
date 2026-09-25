@@ -1,9 +1,6 @@
 import nodemailer from "nodemailer";
 
-import {
-  getServerSupabase,
-  sendError,
-} from "../src/vercelApiUtils";
+import { getServerSupabase, sendError } from '../src/vercelApiUtils.js';
 
 function esc(value: unknown) {
   return String(value ?? "")
