@@ -8,13 +8,12 @@ import {
 import { Layout } from "./components/Layout";
 
 import { Home } from "./pages/Home";
-import { Products } from "./pages/Products";
 import { ProductDetails } from "./pages/ProductDetails";
 import { Cart } from "./pages/Cart";
 import { CustomerRequest } from "./pages/CustomerRequest";
 import { Success } from "./pages/Success";
 
-import { AdminLogin } from "./pages/AdminLogin";
+import  AdminLogin from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
 
 export default function App() {

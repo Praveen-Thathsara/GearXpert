@@ -54,6 +54,7 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState<ProductForm>(emptyProduct);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
@@ -87,6 +88,31 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      if (!session) {
+        // If no active session, redirect to login route
+        navigate('/admin-login'); // Adjust this to match your actual route in App.tsx
+      } else {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabaseClient.auth.signOut();
+    navigate('/admin-login');
+  };
+
+  // Do not render the dashboard while checking credentials
+  if (authLoading) {
+    return <div className="p-10 text-center text-white">Checking authorization...</div>;
   }
 
   useEffect(() => {
@@ -411,8 +437,8 @@ export function AdminDashboard() {
       product.imageUrls && product.imageUrls.length > 0
         ? product.imageUrls
         : product.imageUrl
-        ? [product.imageUrl]
-        : [];
+          ? [product.imageUrl]
+          : [];
 
     setEditingId(product.id);
 
@@ -478,8 +504,8 @@ export function AdminDashboard() {
         product.imageUrls && product.imageUrls.length > 0
           ? product.imageUrls
           : product.imageUrl
-          ? [product.imageUrl]
-          : [];
+            ? [product.imageUrl]
+            : [];
 
       if (productImages.length > 0) {
         await deleteStorageImages(productImages);
@@ -514,8 +540,8 @@ export function AdminDashboard() {
           product.imageUrls && product.imageUrls.length > 0
             ? product.imageUrls
             : product.imageUrl
-            ? [product.imageUrl]
-            : [],
+              ? [product.imageUrl]
+              : [],
       };
 
       const response = await fetch(
@@ -874,8 +900,8 @@ export function AdminDashboard() {
                 {saving
                   ? "Saving..."
                   : editingId
-                  ? "Update Product"
-                  : "Add Product"}
+                    ? "Update Product"
+                    : "Add Product"}
               </button>
 
               {editingId && (
@@ -921,11 +947,11 @@ export function AdminDashboard() {
               {products.map((product) => {
                 const images =
                   product.imageUrls &&
-                  product.imageUrls.length > 0
+                    product.imageUrls.length > 0
                     ? product.imageUrls
                     : product.imageUrl
-                    ? [product.imageUrl]
-                    : [];
+                      ? [product.imageUrl]
+                      : [];
 
                 const hasDiscount =
                   product.discountPrice !== null &&
@@ -986,14 +1012,13 @@ export function AdminDashboard() {
 
                         <div className="flex flex-wrap items-center gap-2 mt-4">
                           <span
-                            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                              product.availability === "In Stock"
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${product.availability === "In Stock"
                                 ? "bg-green-100 text-green-700"
                                 : product.availability ===
                                   "Limited Stock"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
                           >
                             {product.availability}
                           </span>
