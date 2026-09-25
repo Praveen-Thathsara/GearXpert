@@ -1,13 +1,44 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+
   "buildCommand": "npm run build",
+
   "outputDirectory": "dist",
+
   "rewrites": [
-    { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/:path*", "destination": "/index.html" },
-    { "source": "/products/:path*", "destination": "/index.html" },
-    { "source": "/cart", "destination": "/index.html" },
-    { "source": "/request", "destination": "/index.html" },
-    { "source": "/success", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+
+    {
+      "source": "/admin/(.*)",
+      "destination": "/index.html"
+    },
+
+    {
+      "source": "/products/(.*)",
+      "destination": "/index.html"
+    },
+
+    {
+      "source": "/cart",
+      "destination": "/index.html"
+    },
+
+    {
+      "source": "/request",
+      "destination": "/index.html"
+    },
+
+    {
+      "source": "/success",
+      "destination": "/index.html"
+    }
   ]
 }
