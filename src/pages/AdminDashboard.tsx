@@ -50,11 +50,10 @@ const emptyProduct: ProductForm = {
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-
+  const [authLoading, setAuthLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState<ProductForm>(emptyProduct);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
 
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
@@ -90,19 +89,23 @@ export function AdminDashboard() {
     }
   }
 
+  // ALL HOOKS MUST COME BEFORE EARLY RETURNS
   useEffect(() => {
-    const checkAuth = async () => {
+    async function checkAuthAndLoad() {
       const { data: { session } } = await supabaseClient.auth.getSession();
 
       if (!session) {
         // If no active session, redirect to login route
-        navigate('/admin-login'); // Adjust this to match your actual route in App.tsx
-      } else {
-        setAuthLoading(false);
+        navigate('/admin-login'); 
+        return;
       }
-    };
 
-    checkAuth();
+      // If authenticated, stop auth loading and fetch products
+      setAuthLoading(false);
+      await loadProducts();
+    }
+
+    checkAuthAndLoad();
   }, [navigate]);
 
   const handleLogout = async () => {
@@ -110,35 +113,11 @@ export function AdminDashboard() {
     navigate('/admin-login');
   };
 
-  // Do not render the dashboard while checking credentials
-  if (authLoading) {
-    return <div className="p-10 text-center text-white">Checking authorization...</div>;
-  }
-
-  useEffect(() => {
-    async function checkUser() {
-      const {
-        data: { user },
-      } = await supabaseClient.auth.getUser();
-
-      if (!user) {
-        navigate("/admin/login");
-        return;
-      }
-
-      await loadProducts();
-    }
-
-    checkUser();
-  }, [navigate]);
-
   async function getToken() {
-    const {
-      data: { session },
-    } = await supabaseClient.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session) {
-      navigate("/admin/login");
+      navigate("/admin-login");
       throw new Error("Session expired");
     }
 
@@ -581,6 +560,10 @@ export function AdminDashboard() {
   async function logout() {
     await supabaseClient.auth.signOut();
     navigate("/admin/login");
+  }
+
+  if (authLoading) {
+    return <div className="p-10 text-center text-white">Checking authorization...</div>;
   }
 
   return (
