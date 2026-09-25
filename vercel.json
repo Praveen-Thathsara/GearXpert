@@ -1,38 +1,28 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
   "buildCommand": "npm run build",
-
   "outputDirectory": "dist",
-
   "rewrites": [
-    
-
     {
       "source": "/admin",
       "destination": "/index.html"
     },
-
     {
-      "source": "/admin/(.*)",
+      "source": "/admin/:path*",
       "destination": "/index.html"
     },
-
     {
-      "source": "/products/(.*)",
+      "source": "/products/:path*",
       "destination": "/index.html"
     },
-
     {
       "source": "/cart",
       "destination": "/index.html"
     },
-
     {
       "source": "/request",
       "destination": "/index.html"
     },
-
     {
       "source": "/success",
       "destination": "/index.html"
